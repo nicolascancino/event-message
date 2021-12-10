@@ -24,11 +24,11 @@ func main() {
 
 	pubSubInstance := getPubsubInstance(ctx, os.Getenv("PROJECT_ID"))
 	topicInstance := getTopic(pubSubInstance, os.Getenv("TOPIC_ID"))
-	//subscriptionInstance := getSubscription(pubSubInstance, os.Getenv("SUBSCRIPTION_NAME"))
+	subscriptionInstance := getSubscription(pubSubInstance, os.Getenv("SUBSCRIPTION_NAME"))
 
 	publishEventInstance := event.NewDataLoaderPublishEvent(topicInstance, ctx)
-	//listenEventInstance := event.NewDataLoaderListenEvent(subscriptionInstance, ctx)
-	serviceInstance := service.NewMessageService(publishEventInstance)
+	listenEventInstance := event.NewDataLoaderListenEvent(subscriptionInstance, ctx)
+	serviceInstance := service.NewMessageService(publishEventInstance, listenEventInstance)
 	handlerInstance := handler.NewMessageHandler(serviceInstance)
 	muxInstance := mux.NewRouter()
 	routerInstance := router.NewRouter(handlerInstance, muxInstance)
@@ -39,9 +39,6 @@ func main() {
 }
 
 func getTopic(pubSubInstance *pubsub.Client, topicId string) *pubsub.Topic {
-
-	topicInstance := pubSubInstance.Topic(topicId)
-	defer topicInstance.Stop()
 	return pubSubInstance.Topic(topicId)
 }
 
@@ -54,10 +51,5 @@ func getPubsubInstance(ctx context.Context, projectId string) *pubsub.Client {
 	if err != nil {
 		log.Panicf("Error starting pubsub client %v", err.Error())
 	}
-	defer func() {
-		if err := pubsubInstance.Close(); err != nil {
-			log.Printf("Error closing pubsub client %v", err.Error())
-		}
-	}()
 	return pubsubInstance
 }

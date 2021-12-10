@@ -14,11 +14,11 @@ type DataLoaderListenEvent interface {
 }
 type MessageService struct {
 	publishEvent DataLoaderPublishEvent
-	//listenEvent  DataLoaderListenEvent
+	listenEvent  DataLoaderListenEvent
 }
 
-func NewMessageService(publishEvent DataLoaderPublishEvent) *MessageService {
-	return &MessageService{publishEvent: publishEvent}
+func NewMessageService(publishEvent DataLoaderPublishEvent, listenEvent DataLoaderListenEvent) *MessageService {
+	return &MessageService{publishEvent: publishEvent, listenEvent: listenEvent}
 }
 
 func (ms MessageService) PublishMessageService(message *dto.Message) error {
@@ -27,10 +27,7 @@ func (ms MessageService) PublishMessageService(message *dto.Message) error {
 		return err
 	}
 
-	var attributeMaps map[string]string
-	rawAttributes, _ := json.Marshal(message.Attributes)
-	json.Unmarshal(rawAttributes, &attributeMaps)
-	if err := ms.publishEvent.Publish(rawData, attributeMaps); err != nil {
+	if err := ms.publishEvent.Publish(rawData, message.Attributes); err != nil {
 		return err
 	}
 	return nil
