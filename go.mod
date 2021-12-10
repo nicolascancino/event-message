@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	cloud.google.com/go/pubsub v1.17.1
+	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.4.0
 )
 

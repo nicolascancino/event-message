@@ -5,28 +5,36 @@ import (
 	"github.com/nicolascancino/event-message/internal/dto"
 )
 
-type MessageEvent interface {
+type DataLoaderPublishEvent interface {
 	Publish(message []byte, attributes map[string]string) error
 }
+
+type DataLoaderListenEvent interface {
+	ReceiveMessage() (*dto.Out, error)
+}
 type MessageService struct {
-	event MessageEvent
+	publishEvent DataLoaderPublishEvent
+	//listenEvent  DataLoaderListenEvent
 }
 
-func NewMessageService(event MessageEvent) *MessageService {
-	return &MessageService{event: event}
+func NewMessageService(publishEvent DataLoaderPublishEvent) *MessageService {
+	return &MessageService{publishEvent: publishEvent}
 }
 
-func (ms MessageService) FormatMessageService(message *dto.Message) error {
+func (ms MessageService) PublishMessageService(message *dto.Message) error {
+	rawData, err := json.Marshal(message.Data)
+	if err != nil {
+		return err
+	}
 
 	var attributeMaps map[string]string
 	rawAttributes, _ := json.Marshal(message.Attributes)
 	json.Unmarshal(rawAttributes, &attributeMaps)
-
-	rawData, _ := json.Marshal(message.Data)
-
-	if err := ms.event.Publish(rawData, attributeMaps); err != nil {
+	if err := ms.publishEvent.Publish(rawData, attributeMaps); err != nil {
 		return err
 	}
-
 	return nil
+}
+func (ms MessageService) ListenMessageService() {
+
 }

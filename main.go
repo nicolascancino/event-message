@@ -3,19 +3,16 @@ package main
 import (
 	"cloud.google.com/go/pubsub"
 	"context"
-	"encoding/json"
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/nicolascancino/event-message/internal/dto"
 	"github.com/nicolascancino/event-message/internal/event"
+	"github.com/nicolascancino/event-message/internal/handler"
 	"github.com/nicolascancino/event-message/internal/service"
+	"github.com/nicolascancino/event-message/pkg/router"
+	"github.com/nicolascancino/event-message/pkg/server"
 	"log"
-	"net/http"
 	"os"
 )
-
-type MessageService interface {
-	FormatMessageService(message *dto.Message) error
-}
 
 func main() {
 
@@ -23,38 +20,44 @@ func main() {
 		log.Panicf("Error getting enviroment variable  %v", err.Error())
 	}
 
-	http.HandleFunc("/publish", publishMessage)
-	http.ListenAndServe(":8080", nil)
+	var ctx = context.Background()
 
+	pubSubInstance := getPubsubInstance(ctx, os.Getenv("PROJECT_ID"))
+	topicInstance := getTopic(pubSubInstance, os.Getenv("TOPIC_ID"))
+	//subscriptionInstance := getSubscription(pubSubInstance, os.Getenv("SUBSCRIPTION_NAME"))
+
+	publishEventInstance := event.NewDataLoaderPublishEvent(topicInstance, ctx)
+	//listenEventInstance := event.NewDataLoaderListenEvent(subscriptionInstance, ctx)
+	serviceInstance := service.NewMessageService(publishEventInstance)
+	handlerInstance := handler.NewMessageHandler(serviceInstance)
+	muxInstance := mux.NewRouter()
+	routerInstance := router.NewRouter(handlerInstance, muxInstance)
+	serverInstance := server.NewServer(routerInstance)
+	serverInstance.Start()
+
+	log.Println("started publish and listener application")
 }
 
-func publishMessage(w http.ResponseWriter, r *http.Request) {
+func getTopic(pubSubInstance *pubsub.Client, topicId string) *pubsub.Topic {
 
-	var message *dto.Message
-	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
-		log.Printf("Error decoding message %v", err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-	}
+	topicInstance := pubSubInstance.Topic(topicId)
+	defer topicInstance.Stop()
+	return pubSubInstance.Topic(topicId)
+}
 
-	ctx := context.Background()
+func getSubscription(pubSubInstance *pubsub.Client, subscriptionName string) *pubsub.Subscription {
+	return pubSubInstance.Subscription(subscriptionName)
+}
 
-	pubsubInstance, err := pubsub.NewClient(ctx, os.Getenv("PROJECT_ID"))
-
+func getPubsubInstance(ctx context.Context, projectId string) *pubsub.Client {
+	pubsubInstance, err := pubsub.NewClient(ctx, projectId)
 	if err != nil {
 		log.Panicf("Error starting pubsub client %v", err.Error())
 	}
-
-	topic := pubsubInstance.Topic(os.Getenv("TOPIC_ID"))
-
 	defer func() {
 		if err := pubsubInstance.Close(); err != nil {
 			log.Printf("Error closing pubsub client %v", err.Error())
 		}
 	}()
-
-	ev := event.NewDataLoaderEvent(pubsubInstance, topic, ctx)
-	s := service.NewMessageService(ev)
-
-	s.FormatMessageService(message)
-
+	return pubsubInstance
 }
